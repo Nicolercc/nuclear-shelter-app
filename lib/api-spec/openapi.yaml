@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: weather
+    description: Weather data operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,110 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /weather:
+    get:
+      operationId: getWeather
+      tags: [weather]
+      summary: Get current wind data
+      description: Returns current wind speed, direction, and conditions for a given location
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          schema:
+            type: number
+          description: Latitude
+        - name: lon
+          in: query
+          required: true
+          schema:
+            type: number
+          description: Longitude
+      responses:
+        "200":
+          description: Wind and weather data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WeatherData"
+        "500":
+          description: Error fetching weather
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /geocode:
+    get:
+      operationId: geocodeAddress
+      tags: [weather]
+      summary: Geocode an address
+      description: Converts an address string to lat/lng coordinates
+      parameters:
+        - name: address
+          in: query
+          required: true
+          schema:
+            type: string
+          description: The address to geocode
+      responses:
+        "200":
+          description: Geocoded location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeocodedLocation"
+        "404":
+          description: Address not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /escape-route:
+    get:
+      operationId: getEscapeRoute
+      tags: [weather]
+      summary: Get escape route directions
+      description: Returns directions from a location to the nearest safe exit point
+      parameters:
+        - name: originLat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: originLon
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: destLat
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: destLon
+          in: query
+          required: true
+          schema:
+            type: number
+      responses:
+        "200":
+          description: Escape route with encoded polyline
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscapeRoute"
+        "500":
+          description: Error fetching route
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +139,90 @@ components:
           type: string
       required:
         - status
-
+    WeatherData:
+      type: object
+      properties:
+        windSpeed:
+          type: number
+          description: Wind speed in m/s
+        windDeg:
+          type: number
+          description: Wind direction in degrees (meteorological)
+        windGust:
+          type: number
+          description: Wind gust speed in m/s
+        description:
+          type: string
+          description: Weather description
+        temp:
+          type: number
+          description: Temperature in Celsius
+        humidity:
+          type: number
+          description: Humidity percentage
+      required:
+        - windSpeed
+        - windDeg
+        - description
+        - temp
+        - humidity
+    GeocodedLocation:
+      type: object
+      properties:
+        lat:
+          type: number
+        lng:
+          type: number
+        formattedAddress:
+          type: string
+      required:
+        - lat
+        - lng
+        - formattedAddress
+    EscapeRoute:
+      type: object
+      properties:
+        encodedPolyline:
+          type: string
+          description: Google Maps encoded polyline for the route
+        distanceText:
+          type: string
+          description: Human-readable distance
+        durationText:
+          type: string
+          description: Human-readable duration
+        distanceMeters:
+          type: number
+        durationSeconds:
+          type: number
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteStep"
+      required:
+        - encodedPolyline
+        - distanceText
+        - durationText
+        - distanceMeters
+        - durationSeconds
+        - steps
+    RouteStep:
+      type: object
+      properties:
+        instruction:
+          type: string
+        distanceText:
+          type: string
+        durationText:
+          type: string
+      required:
+        - instruction
+        - distanceText
+        - durationText
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error

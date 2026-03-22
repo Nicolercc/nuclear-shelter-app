@@ -6,4 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./errorResponse";
+export * from "./escapeRoute";
+export * from "./geocodeAddressParams";
+export * from "./geocodedLocation";
+export * from "./getEscapeRouteParams";
+export * from "./getWeatherParams";
 export * from "./healthStatus";
+export * from "./routeStep";
+export * from "./weatherData";

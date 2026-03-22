@@ -13,7 +13,16 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  ErrorResponse,
+  EscapeRoute,
+  GeocodeAddressParams,
+  GeocodedLocation,
+  GetEscapeRouteParams,
+  GetWeatherParams,
+  HealthStatus,
+  WeatherData,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -92,6 +101,291 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns current wind speed, direction, and conditions for a given location
+ * @summary Get current wind data
+ */
+export const getGetWeatherUrl = (params: GetWeatherParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/weather?${stringifiedParams}`
+    : `/api/weather`;
+};
+
+export const getWeather = async (
+  params: GetWeatherParams,
+  options?: RequestInit,
+): Promise<WeatherData> => {
+  return customFetch<WeatherData>(getGetWeatherUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWeatherQueryKey = (params?: GetWeatherParams) => {
+  return [`/api/weather`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetWeatherQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWeather>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetWeatherParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWeather>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWeatherQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWeather>>> = ({
+    signal,
+  }) => getWeather(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWeather>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWeatherQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWeather>>
+>;
+export type GetWeatherQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get current wind data
+ */
+
+export function useGetWeather<
+  TData = Awaited<ReturnType<typeof getWeather>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetWeatherParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getWeather>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWeatherQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Converts an address string to lat/lng coordinates
+ * @summary Geocode an address
+ */
+export const getGeocodeAddressUrl = (params: GeocodeAddressParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/geocode?${stringifiedParams}`
+    : `/api/geocode`;
+};
+
+export const geocodeAddress = async (
+  params: GeocodeAddressParams,
+  options?: RequestInit,
+): Promise<GeocodedLocation> => {
+  return customFetch<GeocodedLocation>(getGeocodeAddressUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGeocodeAddressQueryKey = (params?: GeocodeAddressParams) => {
+  return [`/api/geocode`, ...(params ? [params] : [])] as const;
+};
+
+export const getGeocodeAddressQueryOptions = <
+  TData = Awaited<ReturnType<typeof geocodeAddress>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GeocodeAddressParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof geocodeAddress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGeocodeAddressQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof geocodeAddress>>> = ({
+    signal,
+  }) => geocodeAddress(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof geocodeAddress>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GeocodeAddressQueryResult = NonNullable<
+  Awaited<ReturnType<typeof geocodeAddress>>
+>;
+export type GeocodeAddressQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Geocode an address
+ */
+
+export function useGeocodeAddress<
+  TData = Awaited<ReturnType<typeof geocodeAddress>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GeocodeAddressParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof geocodeAddress>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGeocodeAddressQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns directions from a location to the nearest safe exit point
+ * @summary Get escape route directions
+ */
+export const getGetEscapeRouteUrl = (params: GetEscapeRouteParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/escape-route?${stringifiedParams}`
+    : `/api/escape-route`;
+};
+
+export const getEscapeRoute = async (
+  params: GetEscapeRouteParams,
+  options?: RequestInit,
+): Promise<EscapeRoute> => {
+  return customFetch<EscapeRoute>(getGetEscapeRouteUrl(params), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetEscapeRouteQueryKey = (params?: GetEscapeRouteParams) => {
+  return [`/api/escape-route`, ...(params ? [params] : [])] as const;
+};
+
+export const getGetEscapeRouteQueryOptions = <
+  TData = Awaited<ReturnType<typeof getEscapeRoute>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetEscapeRouteParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEscapeRoute>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetEscapeRouteQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getEscapeRoute>>> = ({
+    signal,
+  }) => getEscapeRoute(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getEscapeRoute>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetEscapeRouteQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getEscapeRoute>>
+>;
+export type GetEscapeRouteQueryError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Get escape route directions
+ */
+
+export function useGetEscapeRoute<
+  TData = Awaited<ReturnType<typeof getEscapeRoute>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  params: GetEscapeRouteParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getEscapeRoute>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetEscapeRouteQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

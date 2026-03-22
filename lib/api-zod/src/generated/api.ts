@@ -14,3 +14,63 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns current wind speed, direction, and conditions for a given location
+ * @summary Get current wind data
+ */
+export const GetWeatherQueryParams = zod.object({
+  lat: zod.coerce.number().describe("Latitude"),
+  lon: zod.coerce.number().describe("Longitude"),
+});
+
+export const GetWeatherResponse = zod.object({
+  windSpeed: zod.number().describe("Wind speed in m\/s"),
+  windDeg: zod.number().describe("Wind direction in degrees (meteorological)"),
+  windGust: zod.number().optional().describe("Wind gust speed in m\/s"),
+  description: zod.string().describe("Weather description"),
+  temp: zod.number().describe("Temperature in Celsius"),
+  humidity: zod.number().describe("Humidity percentage"),
+});
+
+/**
+ * Converts an address string to lat/lng coordinates
+ * @summary Geocode an address
+ */
+export const GeocodeAddressQueryParams = zod.object({
+  address: zod.coerce.string().describe("The address to geocode"),
+});
+
+export const GeocodeAddressResponse = zod.object({
+  lat: zod.number(),
+  lng: zod.number(),
+  formattedAddress: zod.string(),
+});
+
+/**
+ * Returns directions from a location to the nearest safe exit point
+ * @summary Get escape route directions
+ */
+export const GetEscapeRouteQueryParams = zod.object({
+  originLat: zod.coerce.number(),
+  originLon: zod.coerce.number(),
+  destLat: zod.coerce.number(),
+  destLon: zod.coerce.number(),
+});
+
+export const GetEscapeRouteResponse = zod.object({
+  encodedPolyline: zod
+    .string()
+    .describe("Google Maps encoded polyline for the route"),
+  distanceText: zod.string().describe("Human-readable distance"),
+  durationText: zod.string().describe("Human-readable duration"),
+  distanceMeters: zod.number(),
+  durationSeconds: zod.number(),
+  steps: zod.array(
+    zod.object({
+      instruction: zod.string(),
+      distanceText: zod.string(),
+      durationText: zod.string(),
+    }),
+  ),
+});

@@ -8,3 +8,71 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface WeatherData {
+  /** Wind speed in m/s */
+  windSpeed: number;
+  /** Wind direction in degrees (meteorological) */
+  windDeg: number;
+  /** Wind gust speed in m/s */
+  windGust?: number;
+  /** Weather description */
+  description: string;
+  /** Temperature in Celsius */
+  temp: number;
+  /** Humidity percentage */
+  humidity: number;
+}
+
+export interface GeocodedLocation {
+  lat: number;
+  lng: number;
+  formattedAddress: string;
+}
+
+export interface RouteStep {
+  instruction: string;
+  distanceText: string;
+  durationText: string;
+}
+
+export interface EscapeRoute {
+  /** Google Maps encoded polyline for the route */
+  encodedPolyline: string;
+  /** Human-readable distance */
+  distanceText: string;
+  /** Human-readable duration */
+  durationText: string;
+  distanceMeters: number;
+  durationSeconds: number;
+  steps: RouteStep[];
+}
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export type GetWeatherParams = {
+  /**
+   * Latitude
+   */
+  lat: number;
+  /**
+   * Longitude
+   */
+  lon: number;
+};
+
+export type GeocodeAddressParams = {
+  /**
+   * The address to geocode
+   */
+  address: string;
+};
+
+export type GetEscapeRouteParams = {
+  originLat: number;
+  originLon: number;
+  destLat: number;
+  destLon: number;
+};
