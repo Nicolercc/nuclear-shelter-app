@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Link } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -685,6 +686,13 @@ export default function NuclearEscapeRouter() {
           >
             ☢ {clickMode ? "Click map..." : "Place Blast"}
           </button>
+          <Link
+            href="/disclaimer"
+            title="Read the full disclaimer"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-yellow-950 hover:bg-yellow-900 text-yellow-400 border border-yellow-800 rounded-md text-xs font-medium transition-colors"
+          >
+            ⚠ Disclaimer
+          </Link>
         </div>
       </header>
 
