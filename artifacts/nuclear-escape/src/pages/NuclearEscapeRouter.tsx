@@ -20,6 +20,13 @@ interface EscapeInfo {
   steps: string[];
 }
 
+interface NearestShelterInfo {
+  shelter: Shelter;
+  distance: number; // meters
+  walkMinutes: number;
+  walkSteps: string[];
+}
+
 interface ResultData {
   blastCenter: LatLng;
   userLocation: LatLng;
@@ -29,6 +36,8 @@ interface ResultData {
   decision: "shelter" | "evacuate";
   distanceFromBlast: number;
   yield: YieldOption;
+  nearestShelter: NearestShelterInfo;
+  topShelters: (Shelter & { distance: number; walkMinutes: number })[];
 }
 
 type YieldOption = "dirty" | "10kt" | "100kt" | "1mt";
@@ -73,19 +82,42 @@ const YIELD_CONFIGS: Record<YieldOption, { label: string; zones: { radius: numbe
   },
 };
 
-const SUBWAY_SHELTERS = [
-  { name: "Times Square 42 St", lat: 40.758, lng: -73.9855 },
-  { name: "Grand Central", lat: 40.7527, lng: -73.9772 },
-  { name: "Penn Station", lat: 40.7505, lng: -73.9934 },
-  { name: "Union Square", lat: 40.7352, lng: -73.9896 },
-  { name: "Jay St MetroTech", lat: 40.6923, lng: -73.9872 },
-  { name: "Fulton St", lat: 40.7095, lng: -74.0074 },
-  { name: "Atlantic Av", lat: 40.6841, lng: -73.9776 },
-  { name: "Jackson Heights", lat: 40.7463, lng: -73.8914 },
-  { name: "Flushing Main St", lat: 40.7596, lng: -73.83 },
-  { name: "161 St Yankee Stadium", lat: 40.8278, lng: -73.9258 },
-  { name: "86 St Upper East", lat: 40.7766, lng: -73.9518 },
-  { name: "Court Sq–23 St", lat: 40.7468, lng: -73.9456 },
+type ShelterType = "subway" | "hospital" | "parking" | "building";
+
+interface Shelter {
+  name: string;
+  type: ShelterType;
+  lat: number;
+  lng: number;
+  floors: string; // e.g. "3 levels underground"
+  capacity: string;
+  address: string;
+}
+
+const SHELTERS: Shelter[] = [
+  // Subway stations (deep underground = best protection)
+  { name: "Times Square–42 St Station", type: "subway", lat: 40.758, lng: -73.9855, floors: "4 levels underground", capacity: "~5,000 people", address: "42nd St & 7th Ave, Manhattan" },
+  { name: "Grand Central–42 St Station", type: "subway", lat: 40.7527, lng: -73.9772, floors: "3 levels underground", capacity: "~4,000 people", address: "42nd St & Lexington Ave, Manhattan" },
+  { name: "Penn Station / 34 St", type: "subway", lat: 40.7505, lng: -73.9934, floors: "3 levels underground", capacity: "~6,000 people", address: "34th St & 8th Ave, Manhattan" },
+  { name: "Union Square–14 St Station", type: "subway", lat: 40.7352, lng: -73.9896, floors: "3 levels underground", capacity: "~3,000 people", address: "14th St & Union Square W, Manhattan" },
+  { name: "Jay St–MetroTech Station", type: "subway", lat: 40.6923, lng: -73.9872, floors: "3 levels underground", capacity: "~2,500 people", address: "Jay St & MetroTech, Brooklyn" },
+  { name: "Fulton St Station", type: "subway", lat: 40.7095, lng: -74.0074, floors: "4 levels underground", capacity: "~3,500 people", address: "Fulton St & Broadway, Manhattan" },
+  { name: "Atlantic Av–Barclays Station", type: "subway", lat: 40.6841, lng: -73.9776, floors: "3 levels underground", capacity: "~3,000 people", address: "Atlantic Ave & Flatbush, Brooklyn" },
+  { name: "Jackson Heights–Roosevelt", type: "subway", lat: 40.7463, lng: -73.8914, floors: "2 levels underground", capacity: "~2,000 people", address: "Roosevelt Ave, Queens" },
+  { name: "Flushing–Main St Station", type: "subway", lat: 40.7596, lng: -73.83, floors: "2 levels underground", capacity: "~2,000 people", address: "Main St & Roosevelt Ave, Queens" },
+  { name: "161 St–Yankee Stadium", type: "subway", lat: 40.8278, lng: -73.9258, floors: "3 levels underground", capacity: "~2,000 people", address: "161st St & River Ave, Bronx" },
+  { name: "86 St Station (Upper East)", type: "subway", lat: 40.7766, lng: -73.9518, floors: "2 levels underground", capacity: "~1,500 people", address: "86th St & Lexington Ave, Manhattan" },
+  { name: "Court Sq–23 St Station", type: "subway", lat: 40.7468, lng: -73.9456, floors: "3 levels underground", capacity: "~2,000 people", address: "23rd St & Jackson Ave, Queens" },
+  // Hospitals with deep basements
+  { name: "Bellevue Hospital", type: "hospital", lat: 40.7390, lng: -73.9759, floors: "Reinforced basement", capacity: "~1,000 people", address: "462 First Ave, Manhattan" },
+  { name: "NY-Presbyterian / Columbia", type: "hospital", lat: 40.8404, lng: -73.9419, floors: "Deep basement complex", capacity: "~800 people", address: "630 W 168th St, Manhattan" },
+  { name: "Kings County Hospital", type: "hospital", lat: 40.6561, lng: -73.9440, floors: "Reinforced basement", capacity: "~700 people", address: "451 Clarkson Ave, Brooklyn" },
+  // Parking garages (below-grade)
+  { name: "Hudson Yards Garage (sub-grade)", type: "parking", lat: 40.7536, lng: -74.0010, floors: "4 levels below ground", capacity: "~800 people", address: "33rd St & 11th Ave, Manhattan" },
+  { name: "World Trade Center Parking", type: "parking", lat: 40.7116, lng: -74.0131, floors: "7 levels below ground", capacity: "~1,200 people", address: "Church St, Lower Manhattan" },
+  // Reinforced concrete buildings
+  { name: "Rockefeller Center Basement", type: "building", lat: 40.7587, lng: -73.9787, floors: "Deep sub-basement", capacity: "~2,000 people", address: "30 Rockefeller Plaza, Manhattan" },
+  { name: "Port Authority Bus Terminal", type: "building", lat: 40.7566, lng: -74.0019, floors: "3 levels underground", capacity: "~3,000 people", address: "625 8th Ave, Manhattan" },
 ];
 
 const PRESET_ADDRESSES: Record<string, LatLng> = {
@@ -204,6 +236,54 @@ function windDegToDir(deg: number): string {
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
+function getShelterIcon(type: ShelterType): string {
+  switch (type) {
+    case "subway": return "🚇";
+    case "hospital": return "🏥";
+    case "parking": return "🅿";
+    case "building": return "🏛";
+  }
+}
+
+function getShelterWalkSteps(user: LatLng, shelter: Shelter): string[] {
+  const latDiff = shelter.lat - user.lat;
+  const lngDiff = shelter.lng - user.lng;
+  const nsDir = latDiff > 0 ? "north" : "south";
+  const ewDir = lngDiff > 0 ? "east" : "west";
+  const icon = getShelterIcon(shelter.type);
+  return [
+    `Head ${Math.abs(latDiff) > Math.abs(lngDiff) ? nsDir : ewDir} on the nearest street`,
+    `Continue straight — look for shelter signs`,
+    `Arrive at ${icon} ${shelter.name}`,
+    `Enter immediately and go as deep underground as possible`,
+    `Move to the lowest level — ${shelter.floors}`,
+    `Stay away from windows and outer walls`,
+    `Wait for official all-clear before leaving`,
+  ];
+}
+
+function findNearestShelter(user: LatLng): NearestShelterInfo {
+  const sorted = SHELTERS
+    .map((s) => ({ ...s, dist: haversineDistance(user, s) }))
+    .sort((a, b) => a.dist - b.dist);
+  const nearest = sorted[0];
+  const walkMinutes = Math.max(1, Math.round(nearest.dist / 80)); // 80m/min walking pace
+  return {
+    shelter: nearest,
+    distance: nearest.dist,
+    walkMinutes,
+    walkSteps: getShelterWalkSteps(user, nearest),
+  };
+}
+
+function getTopShelters(user: LatLng, count = 5) {
+  return SHELTERS
+    .map((s) => ({ ...s, distance: haversineDistance(user, s), walkMinutes: 0 }))
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, count)
+    .map((s) => ({ ...s, walkMinutes: Math.max(1, Math.round(s.distance / 80)) }));
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 export default function NuclearEscapeRouter() {
@@ -217,7 +297,7 @@ export default function NuclearEscapeRouter() {
   const [geoLoading, setGeoLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<ResultData | null>(null);
-  const [activeTab, setActiveTab] = useState<"info" | "route">("info");
+  const [activeTab, setActiveTab] = useState<"shelter" | "info" | "route">("shelter");
   const [clickMode, setClickMode] = useState(false);
   const [selectedYield, setSelectedYield] = useState<YieldOption>("10kt");
   const [blastCenter, setBlastCenter] = useState<LatLng | null>(null);
@@ -264,12 +344,13 @@ export default function NuclearEscapeRouter() {
     const maxRadius = zones[zones.length - 1].radius;
     const distFromBlast = haversineDistance(userCoords, blastCoords);
 
-    // Determine decision based on distance from blast
     const fireballRadius = zones[0].radius;
     const decision: "shelter" | "evacuate" = distFromBlast < fireballRadius ? "shelter" : "evacuate";
 
     const escapeDest = offsetLatLng(userCoords, Math.max(maxRadius + 5000, 15000), (weather.windDeg + 180) % 360);
     const escape = getDummyEscape(userCoords, escapeDest);
+    const nearestShelter = findNearestShelter(userCoords);
+    const topShelters = getTopShelters(userCoords);
 
     const data: ResultData = {
       blastCenter: blastCoords,
@@ -280,6 +361,8 @@ export default function NuclearEscapeRouter() {
       decision,
       distanceFromBlast: distFromBlast,
       yield: yieldType,
+      nearestShelter,
+      topShelters,
     };
 
     // ── Draw blast circles ──
@@ -336,18 +419,46 @@ export default function NuclearEscapeRouter() {
     });
     layersRef.current.push(L.marker([windDest.lat, windDest.lng], { icon: arrowIcon }).addTo(map));
 
-    // ── Subway shelters ──
-    SUBWAY_SHELTERS.forEach((s) => {
+    // ── Shelter markers ──
+    const shelterColorMap: Record<ShelterType, { bg: string; border: string; text: string }> = {
+      subway: { bg: "#0f2d47", border: "#38bdf8", text: "#38bdf8" },
+      hospital: { bg: "#1a1a2e", border: "#f472b6", text: "#f472b6" },
+      parking: { bg: "#1a2e1a", border: "#4ade80", text: "#4ade80" },
+      building: { bg: "#2e2a1a", border: "#fbbf24", text: "#fbbf24" },
+    };
+    SHELTERS.forEach((s) => {
+      const isNearest = s.name === nearestShelter.shelter.name;
+      const c = shelterColorMap[s.type];
+      const icon = getShelterIcon(s.type);
       const shelterIcon = L.divIcon({
-        html: `<div style="background:#0f3460;border:2px solid #38bdf8;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:700;color:#38bdf8;white-space:nowrap;">⬇ ${s.name.split(" ").slice(0, 2).join(" ")}</div>`,
-        iconSize: [92, 22],
-        iconAnchor: [46, 11],
+        html: `<div style="background:${c.bg};border:${isNearest ? "2px" : "1.5px"} solid ${c.border};border-radius:4px;padding:2px 5px;font-size:${isNearest ? "11px" : "10px"};font-weight:${isNearest ? "900" : "700"};color:${c.border};white-space:nowrap;${isNearest ? `box-shadow:0 0 8px ${c.border}80;` : ""}">${icon} ${s.name.split("–")[0].split("/")[0].trim().split(" ").slice(0, 3).join(" ")}</div>`,
+        iconSize: [110, 22],
+        iconAnchor: [55, 11],
         className: "",
       });
       const m = L.marker([s.lat, s.lng], { icon: shelterIcon }).addTo(map)
-        .bindPopup(`<b>🛡 ${s.name}</b><br/>Fallout Shelter`);
+        .bindPopup(`<b>${icon} ${s.name}</b><br/>${s.address}<br/><em>${s.floors}</em><br/>Capacity: ${s.capacity}${isNearest ? "<br/><b style='color:#38bdf8'>★ NEAREST TO YOU</b>" : ""}`);
       layersRef.current.push(m);
     });
+
+    // ── Walking route to nearest shelter ──
+    const shelterLL: L.LatLngExpression = [nearestShelter.shelter.lat, nearestShelter.shelter.lng];
+    const shelterLine = L.polyline(
+      [[userCoords.lat, userCoords.lng], [nearestShelter.shelter.lat, nearestShelter.shelter.lng]],
+      { color: "#38bdf8", weight: 4, opacity: 1, dashArray: "8 5" }
+    ).addTo(map);
+    shelterLine.bindPopup(`<b>Walk to shelter</b><br/>${nearestShelter.walkMinutes} min walk`);
+    layersRef.current.push(shelterLine);
+
+    // Pulsing shelter destination ring
+    const shelterPulse = L.circle(shelterLL, {
+      radius: 80,
+      color: "#38bdf8",
+      weight: 3,
+      fillColor: "#38bdf8",
+      fillOpacity: 0.15,
+    }).addTo(map);
+    layersRef.current.push(shelterPulse);
 
     // ── Escape route ──
     const mid1 = offsetLatLng(userCoords, Math.max(maxRadius * 0.8, 4000), (weather.windDeg + 155) % 360);
@@ -650,60 +761,168 @@ export default function NuclearEscapeRouter() {
                 <span className="text-muted-foreground">Escape route</span>
               </div>
               <div className="flex items-center gap-1.5">
+                <div className="w-5 h-0 flex-none" style={{ borderTop: "2px dashed #38bdf8" }} />
+                <span className="text-muted-foreground">Walk to shelter</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full bg-blue-600 flex-none" />
                 <span className="text-muted-foreground">Your location</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2 rounded bg-blue-900 border border-sky-500 flex-none" />
-                <span className="text-muted-foreground">Subway shelter</span>
-              </div>
+            </div>
+            <div className="pt-1 border-t border-border space-y-1">
+              <p className="text-[9px] uppercase tracking-wide text-muted-foreground/60 font-semibold">Shelters</p>
+              {(["🚇 Subway", "🏥 Hospital", "🅿 Parking", "🏛 Building"] as const).map((s) => (
+                <div key={s} className="flex items-center gap-1.5">
+                  <span className="text-sm flex-none">{s.split(" ")[0]}</span>
+                  <span className="text-muted-foreground">{s.split(" ")[1]}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
         {/* ── Right Panel ── */}
         {result && (
-          <div className="w-72 flex-none border-l border-border bg-card flex flex-col overflow-hidden">
-            {/* Decision */}
-            {result.decision === "shelter" ? (
-              <div className="bg-red-950 border-b border-red-900 p-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">🔴</span>
-                  <span className="text-base font-black text-red-300 tracking-wide">SHELTER IN PLACE</span>
-                </div>
-                <p className="text-xs text-red-400/90">You are in the fireball zone. Do not attempt to flee. Go underground immediately.</p>
-              </div>
-            ) : (
-              <div className="bg-green-950 border-b border-green-900 p-3.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">🟢</span>
-                  <span className="text-base font-black text-green-300 tracking-wide">EVACUATE NOW</span>
-                </div>
-                <p className="text-xs text-green-400/90">Leave immediately via the escape route. Travel opposite to fallout drift.</p>
-              </div>
-            )}
+          <div className="w-80 flex-none border-l border-border bg-card flex flex-col overflow-hidden">
 
-            {/* Tabs */}
+            {/* ── Primary Decision Banner ── */}
+            <div className={`p-3 border-b ${result.decision === "shelter" ? "bg-red-950 border-red-900" : "bg-amber-950 border-amber-900"}`}>
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-lg">{result.decision === "shelter" ? "🔴" : "🟡"}</span>
+                <span className={`text-sm font-black tracking-wide ${result.decision === "shelter" ? "text-red-300" : "text-amber-300"}`}>
+                  {result.decision === "shelter" ? "SHELTER IN PLACE" : "FIND SHELTER OR EVACUATE"}
+                </span>
+              </div>
+              <p className={`text-[11px] ${result.decision === "shelter" ? "text-red-400" : "text-amber-400"}`}>
+                {result.decision === "shelter"
+                  ? "You are in the fireball zone — do NOT flee. Go underground immediately."
+                  : `You are ${(result.distanceFromBlast / 1000).toFixed(1)}km from blast. Shelter underground or evacuate now.`}
+              </p>
+            </div>
+
+            {/* ── Tabs ── */}
             <div className="flex border-b border-border">
-              {(["info", "route"] as const).map((tab) => (
+              {([
+                { key: "shelter", label: "🛡 Find Shelter" },
+                { key: "info", label: "☢ Threat" },
+                { key: "route", label: "🚗 Evacuate" },
+              ] as const).map(({ key, label }) => (
                 <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`flex-1 py-2 text-xs font-medium capitalize transition-colors ${
-                    activeTab === tab
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`flex-1 py-2 text-[11px] font-semibold transition-colors ${
+                    activeTab === key
                       ? "text-primary border-b-2 border-primary bg-primary/5"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {tab === "info" ? "Threat Info" : "Escape Route"}
+                  {label}
                 </button>
               ))}
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {activeTab === "info" ? (
+
+              {/* ══ SHELTER TAB ══ */}
+              {activeTab === "shelter" && (
                 <>
-                  {/* Zone */}
+                  {/* Nearest shelter hero card */}
+                  <div className="rounded-xl border-2 border-sky-500 bg-sky-950/50 p-3.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-lg">{getShelterIcon(result.nearestShelter.shelter.type)}</span>
+                      <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest">Nearest Shelter</span>
+                    </div>
+                    <p className="font-bold text-sm text-white leading-snug mb-1">{result.nearestShelter.shelter.name}</p>
+                    <p className="text-[11px] text-sky-300 mb-2">{result.nearestShelter.shelter.address}</p>
+                    <div className="grid grid-cols-3 gap-2 mb-2">
+                      <div className="bg-sky-900/50 rounded p-1.5 text-center">
+                        <p className="text-[9px] text-sky-400 uppercase">Distance</p>
+                        <p className="font-bold text-xs text-white">
+                          {result.nearestShelter.distance < 1000
+                            ? `${Math.round(result.nearestShelter.distance)}m`
+                            : `${(result.nearestShelter.distance / 1000).toFixed(1)}km`}
+                        </p>
+                      </div>
+                      <div className="bg-sky-900/50 rounded p-1.5 text-center">
+                        <p className="text-[9px] text-sky-400 uppercase">Walk time</p>
+                        <p className="font-bold text-xs text-white">{result.nearestShelter.walkMinutes} min</p>
+                      </div>
+                      <div className="bg-sky-900/50 rounded p-1.5 text-center">
+                        <p className="text-[9px] text-sky-400 uppercase">Depth</p>
+                        <p className="font-bold text-xs text-white leading-none mt-0.5">{result.nearestShelter.shelter.floors.replace("levels", "lvls").replace("underground", "UG").replace("below ground", "BG")}</p>
+                      </div>
+                    </div>
+                    <div className="bg-sky-900/30 rounded p-2 text-[11px] text-sky-200">
+                      <span className="font-semibold">Capacity:</span> {result.nearestShelter.shelter.capacity}
+                    </div>
+                  </div>
+
+                  {/* Walking directions */}
+                  <div className="rounded-lg border border-sky-900/60 bg-muted/20 p-3">
+                    <p className="text-[10px] font-bold text-sky-400 uppercase tracking-wide mb-2">Walking Directions</p>
+                    <div className="space-y-2">
+                      {result.nearestShelter.walkSteps.map((step, i) => (
+                        <div key={i} className="flex gap-2 items-start">
+                          <div className={`w-5 h-5 rounded-full flex-none flex items-center justify-center text-[9px] font-bold mt-0.5 ${
+                            i === result.nearestShelter.walkSteps.length - 1
+                              ? "bg-sky-600 border border-sky-400 text-white"
+                              : "bg-sky-950 border border-sky-800 text-sky-400"
+                          }`}>{i + 1}</div>
+                          <p className={`text-xs leading-relaxed ${i >= result.nearestShelter.walkSteps.length - 2 ? "text-sky-300 font-medium" : "text-foreground"}`}>
+                            {step}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Other nearby shelters */}
+                  <div className="rounded-lg border border-border bg-muted/20 p-3">
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-2">Other Nearby Shelters</p>
+                    <div className="space-y-1.5">
+                      {result.topShelters.slice(1).map((s) => (
+                        <div key={s.name} className="flex items-center gap-2 py-1.5 border-b border-border/40 last:border-0">
+                          <span className="text-base flex-none">{getShelterIcon(s.type)}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate">{s.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{s.floors}</p>
+                          </div>
+                          <div className="text-right flex-none">
+                            <p className="text-xs font-bold text-sky-400">
+                              {s.distance < 1000 ? `${Math.round(s.distance)}m` : `${(s.distance / 1000).toFixed(1)}km`}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">{s.walkMinutes} min</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Once inside tips */}
+                  <div className="rounded-lg border border-yellow-900/50 bg-yellow-950/20 p-3">
+                    <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wide mb-2">⚠ Once Inside the Shelter</p>
+                    <ul className="space-y-1.5">
+                      {[
+                        "Go to the lowest level possible — the deeper the better",
+                        "Stay away from all windows, doors, and outer walls",
+                        "Turn off ventilation systems if possible",
+                        "Do NOT leave until authorities give the all-clear",
+                        "1 meter of concrete = protection from fallout",
+                        "Radiation drops ~90% every 7 hours (7-10 rule)",
+                      ].map((tip, i) => (
+                        <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                          <span className="text-yellow-600 flex-none mt-0.5">•</span>
+                          {tip}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+
+              {/* ══ THREAT INFO TAB ══ */}
+              {activeTab === "info" && (
+                <>
                   {(() => {
                     const zone = getZoneInfo(result.distanceFromBlast, result.yield);
                     return (
@@ -719,7 +938,6 @@ export default function NuclearEscapeRouter() {
                     );
                   })()}
 
-                  {/* Wind */}
                   <div className="rounded-lg border border-border bg-muted/20 p-3">
                     <p className="text-[10px] font-medium text-muted-foreground mb-2 uppercase tracking-wide">Wind / Fallout Direction</p>
                     <div className="grid grid-cols-2 gap-2">
@@ -745,7 +963,6 @@ export default function NuclearEscapeRouter() {
                     </div>
                   </div>
 
-                  {/* Blast zones */}
                   <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{YIELD_CONFIGS[result.yield].label} — Blast Zones</p>
                     {YIELD_CONFIGS[result.yield].zones.map((z) => (
@@ -758,28 +975,15 @@ export default function NuclearEscapeRouter() {
                       </div>
                     ))}
                   </div>
-
-                  {/* Nearest shelters */}
-                  <div className="rounded-lg border border-border bg-muted/20 p-3">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Nearest Subway Shelters</p>
-                    {SUBWAY_SHELTERS
-                      .map((s) => ({ ...s, dist: haversineDistance(result.userLocation, s) }))
-                      .sort((a, b) => a.dist - b.dist)
-                      .slice(0, 4)
-                      .map((s) => (
-                        <div key={s.name} className="flex justify-between items-center py-1 border-b border-border/40 last:border-0">
-                          <p className="text-xs text-foreground">⬇ {s.name}</p>
-                          <p className="text-xs text-muted-foreground">{(s.dist / 1000).toFixed(1)}km</p>
-                        </div>
-                      ))}
-                  </div>
                 </>
-              ) : (
+              )}
+
+              {/* ══ EVACUATE TAB ══ */}
+              {activeTab === "route" && (
                 <>
-                  {/* Escape summary */}
                   <div className="rounded-lg border border-cyan-900 bg-cyan-950/30 p-3">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Escape Summary</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Escape by Car</p>
+                    <div className="grid grid-cols-2 gap-3 mb-2">
                       <div>
                         <p className="text-[10px] text-muted-foreground">Distance</p>
                         <p className="font-bold text-cyan-400">{result.escape.distance}</p>
@@ -789,12 +993,11 @@ export default function NuclearEscapeRouter() {
                         <p className="font-bold text-cyan-400">{result.escape.duration}</p>
                       </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground">
                       Head <span className="text-cyan-400 font-medium">{windDegToDir((result.weather.windDeg + 180) % 360)}</span> — opposite to fallout drift
                     </p>
                   </div>
 
-                  {/* Turn-by-turn */}
                   <div className="rounded-lg border border-border bg-muted/20 p-3">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-2">Step-by-Step Directions</p>
                     <div className="space-y-2">
@@ -809,16 +1012,15 @@ export default function NuclearEscapeRouter() {
                     </div>
                   </div>
 
-                  {/* Emergency tips */}
                   <div className="rounded-lg border border-yellow-900/50 bg-yellow-950/20 p-3">
-                    <p className="text-[10px] font-medium text-yellow-500 uppercase tracking-wide mb-2">⚠ Emergency Tips</p>
+                    <p className="text-[10px] font-medium text-yellow-500 uppercase tracking-wide mb-2">⚠ Before You Leave</p>
                     <ul className="space-y-1.5">
                       {[
-                        "Grab go-bag before leaving (water, docs, meds)",
-                        "Keep all windows closed while driving",
-                        "Avoid subway — may be compromised",
+                        "Grab go-bag (water, docs, meds, cash)",
+                        "Keep all car windows fully closed",
+                        "Do NOT use subway — may be compromised",
                         "Tune to AM radio for emergency broadcasts",
-                        "Do not stop moving until outside the zone",
+                        "Do not stop until outside blast zone",
                       ].map((tip, i) => (
                         <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
                           <span className="text-yellow-600 flex-none">•</span>
