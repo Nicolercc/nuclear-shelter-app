@@ -6,7 +6,7 @@ WORKDIR /app
 
 RUN corepack enable pnpm
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json tsconfig.json .
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json tsconfig.json ./
 COPY artifacts artifacts
 COPY lib lib
 COPY scripts scripts
