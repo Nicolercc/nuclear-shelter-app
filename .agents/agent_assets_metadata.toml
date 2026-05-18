@@ -1,8 +1,0 @@
-uploads = []
-generated = []
-
-[[outputs]]
-id = "hHhmOkVBpXUkIIxiWkZxb"
-uri = "file://.local/tasks/prd-technical-overview.md"
-type = "text"
-title = "Nuclear Escape Router — PRD & Technical Overview"
