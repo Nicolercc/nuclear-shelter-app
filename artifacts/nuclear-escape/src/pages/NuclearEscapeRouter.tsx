@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "wouter";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { fetchLiveEscapeRoute, fetchLiveGeocode, fetchLiveWeather } from "@/lib/nuclear-api";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -292,6 +293,7 @@ export default function NuclearEscapeRouter() {
   const mapInstanceRef = useRef<L.Map | null>(null);
   const layersRef = useRef<L.Layer[]>([]);
   const clickHandlerRef = useRef<((e: L.LeafletMouseEvent) => void) | null>(null);
+  const analyzeAbortRef = useRef<AbortController | null>(null);
 
   const [address, setAddress] = useState("");
   const [loading, setLoading] = useState(false);
@@ -335,38 +337,59 @@ export default function NuclearEscapeRouter() {
   }, []);
 
   // ── Core analysis function (shared by search, geo, click) ───────────────────
-  const analyze = useCallback((userCoords: LatLng, blastCoords: LatLng, label: string, yieldType: YieldOption) => {
+  const analyze = useCallback(async (userCoords: LatLng, blastCoords: LatLng, label: string, yieldType: YieldOption) => {
+    analyzeAbortRef.current?.abort();
+    const controller = new AbortController();
+    analyzeAbortRef.current = controller;
+    const signal = controller.signal;
+
     const map = mapInstanceRef.current;
     if (!map) return;
     clearLayers();
 
-    const weather = getDummyWeather();
     const zones = YIELD_CONFIGS[yieldType].zones;
-    const maxRadius = zones[zones.length - 1].radius;
-    const distFromBlast = haversineDistance(userCoords, blastCoords);
 
-    const fireballRadius = zones[0].radius;
-    const decision: "shelter" | "evacuate" = distFromBlast < fireballRadius ? "shelter" : "evacuate";
+    try {
+      const weather =
+        (await fetchLiveWeather(userCoords.lat, userCoords.lng, signal)) ?? getDummyWeather();
+      const maxRadius = zones[zones.length - 1].radius;
+      const distFromBlast = haversineDistance(userCoords, blastCoords);
 
-    const escapeDest = offsetLatLng(userCoords, Math.max(maxRadius + 5000, 15000), (weather.windDeg + 180) % 360);
-    const escape = getDummyEscape(userCoords, escapeDest);
-    const nearestShelter = findNearestShelter(userCoords);
-    const topShelters = getTopShelters(userCoords);
+      const fireballRadius = zones[0].radius;
+      const decision: "shelter" | "evacuate" = distFromBlast < fireballRadius ? "shelter" : "evacuate";
 
-    const data: ResultData = {
-      blastCenter: blastCoords,
-      userLocation: userCoords,
-      address: label,
-      weather,
-      escape,
-      decision,
-      distanceFromBlast: distFromBlast,
-      yield: yieldType,
-      nearestShelter,
-      topShelters,
-    };
+      const escapeDest = offsetLatLng(userCoords, Math.max(maxRadius + 5000, 15000), (weather.windDeg + 180) % 360);
+      const liveRoute = await fetchLiveEscapeRoute(
+        userCoords.lat,
+        userCoords.lng,
+        escapeDest.lat,
+        escapeDest.lng,
+        signal,
+      );
+      const escape: EscapeInfo = liveRoute
+        ? {
+            distance: liveRoute.distanceText,
+            duration: liveRoute.durationText,
+            steps: liveRoute.steps,
+          }
+        : getDummyEscape(userCoords, escapeDest);
+      const nearestShelter = findNearestShelter(userCoords);
+      const topShelters = getTopShelters(userCoords);
 
-    // ── Draw blast circles ──
+      const data: ResultData = {
+        blastCenter: blastCoords,
+        userLocation: userCoords,
+        address: label,
+        weather,
+        escape,
+        decision,
+        distanceFromBlast: distFromBlast,
+        yield: yieldType,
+        nearestShelter,
+        topShelters,
+      };
+
+      // ── Draw blast circles ──
     const blastLL: L.LatLngExpression = [blastCoords.lat, blastCoords.lng];
     [...zones].reverse().forEach((zone) => {
       const circle = L.circle(blastLL, {
@@ -489,18 +512,27 @@ export default function NuclearEscapeRouter() {
     layersRef.current.push(distLine);
 
     // ── Fit map ──
-    map.fitBounds(
-      L.latLngBounds([
-        [blastCoords.lat, blastCoords.lng],
-        [escapeDest.lat, escapeDest.lng],
-      ]),
-      { padding: [50, 50] }
-    );
+      map.fitBounds(
+        L.latLngBounds([
+          [blastCoords.lat, blastCoords.lng],
+          [escapeDest.lat, escapeDest.lng],
+        ]),
+        { padding: [50, 50] },
+      );
 
-    setResult(data);
-    setLoading(false);
-    setGeoLoading(false);
+      setResult(data);
+    } finally {
+      setLoading(false);
+      setGeoLoading(false);
+    }
   }, [clearLayers]);
+
+  useEffect(
+    () => () => {
+      analyzeAbortRef.current?.abort();
+    },
+    [],
+  );
 
   // ── Handle address search ───────────────────────────────────────────────────
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
@@ -511,16 +543,21 @@ export default function NuclearEscapeRouter() {
     setError("");
     await new Promise((r) => setTimeout(r, 700));
 
-    const coords = geocodeAddress(address);
+    const fromApi = await fetchLiveGeocode(address.trim());
+    const coords = fromApi
+      ? { lat: fromApi.lat, lng: fromApi.lng }
+      : geocodeAddress(address);
     if (!coords) {
       setError("Address not found. Try: 'Times Square', 'Brooklyn Bridge', '10001', or a NYC neighborhood name.");
       setLoading(false);
       return;
     }
 
+    const label = fromApi?.formattedAddress ?? address;
+
     // Default blast center = midtown (Times Square) if none placed
     const blast = blastCenter ?? { lat: 40.758, lng: -73.9855 };
-    analyze(coords, blast, address, selectedYield);
+    await analyze(coords, blast, label, selectedYield);
   }, [address, blastCenter, selectedYield, analyze]);
 
   // ── Geolocation ─────────────────────────────────────────────────────────────
@@ -536,7 +573,7 @@ export default function NuclearEscapeRouter() {
         const userCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         const blast = blastCenter ?? { lat: 40.758, lng: -73.9855 };
         setAddress("My Location");
-        analyze(userCoords, blast, "My Location (GPS)", selectedYield);
+        void analyze(userCoords, blast, "My Location (GPS)", selectedYield);
       },
       (err) => {
         setGeoLoading(false);
@@ -566,7 +603,7 @@ export default function NuclearEscapeRouter() {
 
         // If we already have a result, re-analyze with new blast center
         if (result) {
-          analyze(result.userLocation, clicked, result.address, selectedYield);
+          void analyze(result.userLocation, clicked, result.address, selectedYield);
         } else {
           // Just show a temporary blast marker
           clearLayers();
