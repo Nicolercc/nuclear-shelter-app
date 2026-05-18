@@ -8,119 +8,128 @@ An interactive nuclear emergency preparedness and simulation tool for New York C
 
 ## Features
 
-- **Interactive Leaflet Map** — dark-themed NYC map with real-time layer rendering
-- **Blast Zone Visualization** — concentric color-coded zones for four yield types: Dirty Bomb, 10 Kiloton, 100 Kiloton, 1 Megaton
-- **Click-to-Place Blast Center** — click anywhere on the map to set the detonation point
-- **Address Search** — search by NYC neighborhood, landmark, zip code, or street address
-- **GPS Location** — use your browser's geolocation to set your position
-- **Nearest Shelter Finder** — calculates the closest of 17 pre-loaded NYC shelters (subway stations, hospitals, parking garages, reinforced buildings)
-- **Shelter Recommendations** — walking directions, estimated walk time, depth, and capacity
-- **Fallout Drift Arrow** — wind-direction-based fallout plume visualization
-- **Escape Route** — algorithmically generated evacuation path away from the blast zone
-- **Shelter-in-Place vs. Evacuate Decision** — recommends the optimal response based on your distance from the fireball zone
-- **Disclaimer Modal** — first-launch disclaimer with localStorage-based acceptance gate
-- **Persistent Disclaimer Link** — always-visible link to the full disclaimer page
+- **Interactive Leaflet Map** — dark-themed NYC map with layer rendering  
+- **Blast zone visualization** — four yield types with concentric zones  
+- **Click-to-place blast center** — set the detonation point on the map  
+- **Address search** — heuristic lookup offline; upgrade to Google Geocoding via the API when `GOOGLE_MAPS_KEY` is set  
+- **GPS location** — browser geolocation for your position  
+- **Shelter finder** — distance ordering over a fixed NYC shelter set  
+- **Escape route panel** — Google Directions via API when configured; otherwise illustrative steps  
 
 ---
 
 ## Architecture
 
-This is a **pnpm monorepo** with two main artifacts and shared libraries:
+pnpm monorepo:
 
 ```
 /
 ├── artifacts/
-│   ├── nuclear-escape/      # React + Vite frontend (Leaflet map SPA)
-│   └── api-server/          # Express backend API (proxies OpenWeather + Google Maps)
+│   ├── nuclear-escape/      # React + Vite SPA
+│   └── api-server/          # Express API (weather, geocode, directions proxies)
 ├── lib/
-│   ├── api-spec/            # OpenAPI specification (YAML)
-│   ├── api-zod/             # Generated Zod schemas
-│   └── api-client-react/    # Generated React Query hooks
-└── docs/
-    ├── ARCHITECTURE.md      # Full architecture diagram and data flow
-    └── DISCLAIMER.md        # Version-controlled legal disclaimer text
+│   ├── api-spec/, api-zod/, api-client-react/   # OpenAPI + codegen
+│   └── db/                  # Drizzle (optional future persistence)
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── DISCLAIMER.md
+├── .github/workflows/ci.yml
+├── Dockerfile               # Production image for api-server only
+└── README.md
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture diagram, data flow walkthrough, and spatial calculation logic.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for diagrams and data flow.
 
 ---
 
-## Quick Start
+## Quick start
 
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+
-- [pnpm](https://pnpm.io/) 9+
-
-### Installation
+**Prerequisites:** Node.js 20+, pnpm 9+, Corepack enabled (`corepack enable pnpm`).
 
 ```bash
-# Clone the repo
 git clone <repo-url>
-cd nuclear-escape-router
-
-# Install all dependencies
+cd Nuclear-Force
 pnpm install
-```
 
-### Running the App
-
-```bash
-# Start the frontend (React + Vite)
+# Terminal 1 — frontend (proxies /api → :3001 in dev)
 cd artifacts/nuclear-escape
 PORT=3000 pnpm dev
 
-# Start the backend (Express API server) — in a separate terminal
+# Terminal 2 — API
 cd artifacts/api-server
 PORT=3001 pnpm dev
 ```
 
-The frontend will be available at `http://localhost:3000`. The API server runs at `http://localhost:3001`.
-
-> In the Replit environment, workflows manage port assignment automatically via the `PORT` environment variable.
-
-### Build for Production
-
-```bash
-# Build the frontend
-cd artifacts/nuclear-escape
-pnpm build
-
-# Build the backend
-cd artifacts/api-server
-pnpm build
-```
+Open `http://localhost:3000`. Configure API keys so the SPA can reach live providers (optional — heuristics and simulated weather work without keys).
 
 ---
 
-## Environment Variables
+## Environment variables
 
-| Variable | Required | Description |
-|---|---|---|
-| `PORT` | **Yes** | Port for each service (assigned automatically in Replit) |
-| `OPENWEATHER_API_KEY` | No | OpenWeather API key for real-time wind and weather data. Without this, the app falls back to simulated weather. Get one at [openweathermap.org](https://openweathermap.org/api). |
-| `GOOGLE_MAPS_KEY` | No | Google Maps Platform API key (Geocoding + Directions APIs). Without this, geocoding falls back to an offline lookup table, and escape routes are algorithmically approximated. Get one at [console.cloud.google.com](https://console.cloud.google.com/). |
+| Variable | Where | Purpose |
+|---------|-------|---------|
+| `PORT` | Both apps | Listen port (`3000` / `3001` typical) |
+| `VITE_API_BASE_URL` | Frontend build only | Cross-origin API base (omit for same-origin `/api`) |
+| `API_PROXY_TARGET` | Frontend dev (`vite`) | Proxy target for `/api` (default `http://127.0.0.1:3001`) |
+| `CORS_ORIGIN` | API | Comma-separated allowed browser origins (`https://yourapp.com`) |
+| `OPENWEATHER_API_KEY` | API | Live wind/weather (`/api/weather`) |
+| `GOOGLE_MAPS_KEY` | API | Geocoding + Directions (`/api/geocode`, `/api/escape-route`) |
 
-Set these in `.env` files at the artifact level, or configure them as environment secrets in Replit:
-
-```bash
-# artifacts/api-server/.env (do not commit this file)
-OPENWEATHER_API_KEY=your_key_here
-GOOGLE_MAPS_KEY=your_key_here
-```
+Copy `artifacts/api-server/.env.example` and `artifacts/nuclear-escape/.env.example` into `.env` files as needed — never commit real secrets.
 
 ---
 
-## Sub-Project Documentation
+## Build & CI
 
-- [artifacts/nuclear-escape/README.md](artifacts/nuclear-escape/README.md) — Frontend setup, Vite config, Leaflet notes, component guide
-- [artifacts/api-server/README.md](artifacts/api-server/README.md) — Backend setup, API endpoint reference, error handling
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — System architecture, data flow, spatial logic
-- [docs/DISCLAIMER.md](docs/DISCLAIMER.md) — Full legal disclaimer text
-- [CONTRIBUTING.md](CONTRIBUTING.md) — How to contribute, branch conventions, adding shelters
+From the repo root:
+
+```bash
+pnpm run typecheck   # libs + artifacts
+pnpm run build       # production build for all workspaces that define build
+```
+
+GitHub Actions runs the same on every push / PR (`/.github/workflows/ci.yml`).
+
+---
+
+## Deployment
+
+### Docker (recommended — single container)
+
+Builds the SPA and API; serves both on port **3000** (same origin, no `VITE_API_BASE_URL` needed).
+
+```bash
+docker compose up --build
+# open http://localhost:3000
+```
+
+Pass API keys via environment or a `.env` file next to `docker-compose.yml`:
+
+```yaml
+environment:
+  OPENWEATHER_API_KEY: "..."
+  GOOGLE_MAPS_KEY: "..."
+```
+
+### Split deploy
+
+**Frontend only:** `pnpm --filter @workspace/nuclear-escape run build` → upload `artifacts/nuclear-escape/dist/public`.  
+Set `VITE_API_BASE_URL` at build time if the API is on another host; set `CORS_ORIGIN` on the API.
+
+**API only:** `pnpm --filter @workspace/api-server run build` → run `node artifacts/api-server/dist/index.mjs` with `PORT=3001`.
+
+---
+
+## Documentation
+
+- [artifacts/nuclear-escape/README.md](artifacts/nuclear-escape/README.md) — frontend specifics  
+- [artifacts/api-server/README.md](artifacts/api-server/README.md) — API routes  
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system diagram  
+- [docs/DISCLAIMER.md](docs/DISCLAIMER.md) — legal disclaimer  
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contributing  
 
 ---
 
 ## License
 
-This project is provided for educational and preparedness planning purposes only. See [docs/DISCLAIMER.md](docs/DISCLAIMER.md) for terms of use.
+MIT — see [LICENSE](LICENSE). This project is educational; see [docs/DISCLAIMER.md](docs/DISCLAIMER.md) for usage expectations.
