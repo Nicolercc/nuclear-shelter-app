@@ -25,7 +25,7 @@ graph TD
         WeatherRoute["GET /api/weather"]
         GeocodeRoute["GET /api/geocode"]
         EscapeRoute["GET /api/escape-route"]
-        HealthRoute["GET /api/health"]
+        HealthRoute["GET /api/healthz"]
     end
 
     subgraph External ["Third-Party APIs"]
@@ -34,11 +34,10 @@ graph TD
         OSM["OpenStreetMap\n(Map Tiles via Leaflet)"]
     end
 
-    subgraph Shared ["Shared Libraries (lib/)"]
-        ApiSpec["api-spec\n(OpenAPI YAML + Zod schemas)"]
-        ApiZod["api-zod\n(generated TypeScript types)"]
-        ApiClientReact["api-client-react\n(React Query hooks)"]
-        DB["db\n(Drizzle ORM schema)"]
+    subgraph Shared ["Shared libraries (lib/)"]
+        ApiSpec["api-spec\n(OpenAPI + Orval codegen)"]
+        ApiZod["api-zod\n(generated Zod validators)"]
+        ApiClientReact["api-client-react\ngenerated client (reserved)"]
     end
 
     User --> App
@@ -46,15 +45,14 @@ graph TD
     App --> NER
     App --> DisclaimerPage
     NER --> Leaflet
-    NER --> Backend
+    NER -.->|optional REST| Backend
 
     Express --> WeatherRoute --> OpenWeather
     Express --> GeocodeRoute --> GoogleMaps
     Express --> EscapeRoute --> GoogleMaps
     Leaflet --> OSM
 
-    ApiSpec --> ApiZod --> ApiClientReact --> NER
-    DB --> Backend
+    ApiSpec --> ApiZod --> ApiClientReact
 ```
 
 ---
@@ -86,16 +84,13 @@ graph TD
 │   │   │   ├── routes/
 │   │   │   │   ├── index.ts     # Route registry
 │   │   │   │   ├── nuclear.ts   # /weather, /geocode, /escape-route endpoints
-│   │   │   │   └── health.ts    # /health endpoint
+│   │   │   │   └── health.ts    # GET /healthz — liveness probe
 │   │   │   ├── lib/
 │   │   │   │   └── logger.ts    # Pino logger
 │   │   │   └── middlewares/     # Express middleware
 │   │   ├── build.mjs            # esbuild build script
 │   │   └── package.json
 │   │
-│   └── mockup-sandbox/          # Design component preview server
-│
-├── lib/
 │   ├── api-spec/                # OpenAPI YAML specification
 │   │   └── openapi.yaml
 │   ├── api-zod/                 # Auto-generated Zod schemas from OpenAPI
