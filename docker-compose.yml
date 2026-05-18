@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      STATIC_DIR: /app/public
+      # OPENWEATHER_API_KEY: ""
+      # GOOGLE_MAPS_KEY: ""
+      # CORS_ORIGIN: "http://localhost:3000"
+    restart: unless-stopped
