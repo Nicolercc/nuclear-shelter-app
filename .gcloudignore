@@ -1,0 +1,16 @@
+.git
+.github
+**/.env
+.env
+.env.*
+node_modules
+**/node_modules
+.pnpm-store
+**/.pnpm-store
+dist
+**/dist
+coverage
+.cache
+.local
+*.md
+!README.md
