@@ -49,7 +49,7 @@ const staticDir = process.env.STATIC_DIR?.trim();
 if (staticDir) {
   const resolved = path.resolve(staticDir);
   app.use(express.static(resolved, { index: false }));
-  app.get("/*", (req, res, next) => {
+  app.get("/:path(.*)", (req, res, next) => {
     if (req.path.startsWith("/api")) {
       next();
       return;
