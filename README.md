@@ -96,12 +96,44 @@ GitHub Actions runs the same on every push / PR (`/.github/workflows/ci.yml`).
 
 ### Docker (recommended — single container)
 
-Builds the SPA and API; serves both on port **3000** (same origin, no `VITE_API_BASE_URL` needed).
+Builds the SPA and API; serves both on port **8080** (same origin, no `VITE_API_BASE_URL` needed).
 
 ```bash
 docker compose up --build
-# open http://localhost:3000
+# open http://localhost:8080
 ```
+
+### Google Cloud Run
+
+The root `Dockerfile` is tuned for Cloud Run: listens on **`0.0.0.0`**, uses **`PORT=8080`**, and serves the built SPA from `STATIC_DIR`.
+
+1. Enable APIs and create an Artifact Registry repo (once per project):
+
+```bash
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
+gcloud artifacts repositories create cloud-run-source-deploy \
+  --repository-format=docker --location=us-central1
+```
+
+2. Build with Cloud Build (uses `cloudbuild.yaml`):
+
+```bash
+gcloud builds submit --config=cloudbuild.yaml
+```
+
+3. Deploy the image:
+
+```bash
+gcloud run deploy nuclear-force \
+  --image us-central1-docker.pkg.dev/YOUR_PROJECT_ID/cloud-run-source-deploy/nuclear-force:latest \
+  --region us-central1 \
+  --port 8080 \
+  --allow-unauthenticated \
+  --set-env-vars "STATIC_DIR=/app/public" \
+  --set-secrets "OPENWEATHER_API_KEY=openweather:latest,GOOGLE_MAPS_KEY=google-maps:latest"
+```
+
+Create secrets in Secret Manager first, or pass keys with `--set-env-vars` for testing. Optional: `CORS_ORIGIN` if you split the frontend to another host later.
 
 Pass API keys via environment or a `.env` file next to `docker-compose.yml`:
 

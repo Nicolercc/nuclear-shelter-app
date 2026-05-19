@@ -1,0 +1,25 @@
+# Google Cloud Build — builds the production image for Cloud Run.
+# Deploy after build:
+#   gcloud run deploy nuclear-force \
+#     --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/nuclear-force:$COMMIT_SHA" \
+#     --region "${_REGION}" --port 8080 --allow-unauthenticated
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: cloud-run-source-deploy
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/nuclear-force:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/nuclear-force:latest
+      - .
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/nuclear-force:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/nuclear-force:latest
+
+options:
+  logging: CLOUD_LOGGING_ONLY
