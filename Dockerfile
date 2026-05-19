@@ -11,7 +11,7 @@ COPY artifacts artifacts
 COPY lib lib
 COPY scripts scripts
 
-RUN pnpm install
+RUN pnpm install --ignore-scripts
 RUN pnpm --filter @workspace/nuclear-escape run build
 RUN pnpm --filter @workspace/api-server run build
 
