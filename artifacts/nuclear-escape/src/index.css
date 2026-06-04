@@ -196,4 +196,23 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
   }
+
+  .spin-slow {
+    display: inline-block;
+    animation: spin-slow 3s linear infinite;
+  }
+
+  .dot-pulse {
+    animation: dot-pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
 }

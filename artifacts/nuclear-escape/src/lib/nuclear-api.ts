@@ -45,7 +45,7 @@ export async function fetchLiveWeather(
   temp: number;
   humidity: number;
 } | null> {
-  const u = new URL(resolveApiUrl("/weather"));
+  const u = new URL(resolveApiUrl("/weather"), window.location.origin);
   u.searchParams.set("lat", String(lat));
   u.searchParams.set("lon", String(lon));
   type Row = {
@@ -80,7 +80,7 @@ export async function fetchLiveGeocode(
   address: string,
   signal?: AbortSignal,
 ): Promise<{ lat: number; lng: number; formattedAddress: string } | null> {
-  const u = new URL(resolveApiUrl("/geocode"));
+  const u = new URL(resolveApiUrl("/geocode"), window.location.origin);
   u.searchParams.set("address", address);
   type Row = { lat?: number; lng?: number; formattedAddress?: string };
   const r = await fetchJson<Row>(u.toString(), signal);
@@ -110,8 +110,9 @@ export async function fetchLiveEscapeRoute(
   distanceText: string;
   durationText: string;
   steps: string[];
+  encodedPolyline?: string;
 } | null> {
-  const u = new URL(resolveApiUrl("/escape-route"));
+  const u = new URL(resolveApiUrl("/escape-route"), window.location.origin);
   u.searchParams.set("originLat", String(originLat));
   u.searchParams.set("originLon", String(originLon));
   u.searchParams.set("destLat", String(destLat));
@@ -121,6 +122,7 @@ export async function fetchLiveEscapeRoute(
     distanceText?: string;
     durationText?: string;
     steps?: Step[];
+    encodedPolyline?: string;
   };
   const r = await fetchJson<Row>(u.toString(), signal);
   if (!r.ok) return null;
@@ -138,5 +140,40 @@ export async function fetchLiveEscapeRoute(
     distanceText: d.distanceText,
     durationText: d.durationText,
     steps,
+    encodedPolyline: typeof d.encodedPolyline === "string" ? d.encodedPolyline : undefined,
   };
+}
+
+export async function fetchAISurvivalBrief(params: {
+  blastLocation: string;
+  userLocation: string;
+  distanceKm: string;
+  yieldLabel: string;
+  zoneName: string;
+  decision: string;
+  weatherDesc: string;
+  windDir: string;
+  windSpeed: string;
+  nearestShelterName: string;
+  nearestShelterDistance: string;
+  nearestShelterWalkMinutes: string;
+  safeZoneName: string;
+  escapeDuration: string;
+}, signal?: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch(
+      new URL(resolveApiUrl("/brief"), window.location.origin).toString(),
+      {
+        method: "POST",
+        signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { brief?: string };
+    return data.brief ?? null;
+  } catch {
+    return null;
+  }
 }
