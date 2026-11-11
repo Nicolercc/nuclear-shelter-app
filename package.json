@@ -11,6 +11,7 @@
 		"test": "pnpm -r --if-present run test"
 	},
 	"private": true,
+	"packageManager": "pnpm@10.34.9",
 	"devDependencies": {
 		"typescript": "~5.9.2",
 		"prettier": "^3.8.1"
