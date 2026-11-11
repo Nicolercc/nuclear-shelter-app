@@ -2,6 +2,10 @@
 
 An interactive nuclear emergency preparedness and simulation tool for New York City. Built for educational use — visualize blast zones, find the nearest shelter, and plan evacuation routes based on your location and the type of event.
 
+**Live demo:** https://nuclear-escape.vercel.app (runs with simulated weather when API keys aren't set)
+
+[![CI](https://github.com/Nicolercc/nuclear-shelter-app/actions/workflows/ci.yml/badge.svg)](https://github.com/Nicolercc/nuclear-shelter-app/actions/workflows/ci.yml)
+
 > **Disclaimer:** This is an educational simulation tool only. In a real emergency, follow official guidance from [NYC OEM](https://nyc.gov/emergency) and [FEMA](https://ready.gov). See [docs/DISCLAIMER.md](docs/DISCLAIMER.md) for the full disclaimer.
 
 ---
